@@ -55,7 +55,7 @@ init() {
   masterNode="$2"
   chmod 600 "$pemFile"
   makeYumRepo "$pemFile" "$masterNode"
-  yum -y install vim wget zip unzip expect tree htop iotop nc telnet lrzsz openssl-devel emrfs emr-ddb emr-goodies emr-kinesis emr-s3-select emr-scripts emr-puppet
+  yum -y install vim wget zip unzip expect tree htop iotop nc telnet lrzsz openssl-devel emrfs emr-ddb emr-goodies emr-kinesis emr-s3-select emr-scripts emr-puppet mysql-connector-java
   makeHadoopUser "$pemFile"
   makeDir
   makeJdk
@@ -145,6 +145,15 @@ makeSparkClient() {
   chmod 777 -R /var/log/spark/user
 }
 
+makeFlinkClient() {
+  pemFile="$1"
+  masterNode="$2"
+  yum -y install flink
+  rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=10 -i $pemFile" hadoop@$masterNode:'/etc/flink/conf/*' /etc/flink/conf
+  echo "fs.overwrite-files: true" | tee -a /etc/flink/conf/flink-conf.yaml
+  echo "s3.path.style.access: true" | tee -a /etc/flink/conf/flink-conf.yaml
+}
+
 makeHBaseClient() {
   pemFile="$1"
   masterNode="$2"
@@ -156,10 +165,13 @@ makeHBaseClient() {
 
 makeHudiClient() {
   yum -y install hudi
+  rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=10 -i $pemFile" hadoop@$masterNode:'/etc/hudi/conf/*' /etc/hudi/conf
 }
 
 makeSqoopClient() {
   yum -y install sqoop
+  ln -sf /usr/lib/hive/lib/libthrift-0.9.3.jar /usr/lib/sqoop/lib/
+  ln -sf /etc/hive/conf/hive-site.xml /etc/sqoop/conf/
 }
 
 makeOozieClient() {
@@ -199,6 +211,10 @@ case $1 in
   make-oozie-client)
     shift
     makeOozieClient "$@"
+    ;;
+  make-flink-client)
+    shift
+    makeFlinkClient "$@"
     ;;
   make-hudi-client)
     makeHudiClient
